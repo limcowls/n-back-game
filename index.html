@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>N-Back 뇌 훈련</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;700;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --card: #1a2235;
+    --accent: #4fd1c5;
+    --accent2: #f6ad55;
+    --accent3: #fc8181;
+    --text: #e2e8f0;
+    --text-muted: #718096;
+    --border: #2d3748;
+    --correct: #68d391;
+    --wrong: #fc8181;
+    --neutral: #4fd1c5;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* Animated background */
+  body::before {
+    content: '';
+    position: fixed;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(ellipse at 20% 20%, rgba(79,209,197,0.06) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 80%, rgba(246,173,85,0.05) 0%, transparent 50%),
+      radial-gradient(ellipse at 50% 50%, rgba(252,129,129,0.03) 0%, transparent 60%);
+    animation: bgPulse 8s ease-in-out infinite alternate;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  @keyframes bgPulse {
+    0% { transform: scale(1) rotate(0deg); }
+    100% { transform: scale(1.05) rotate(2deg); }
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 700px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  /* Header */
+  .header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .header .badge {
+    display: inline-block;
+    background: rgba(79,209,197,0.15);
+    border: 1px solid rgba(79,209,197,0.3);
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 6px 16px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+    text-transform: uppercase;
+  }
+
+  .header h1 {
+    font-size: clamp(2rem, 6vw, 3.2rem);
+    font-weight: 900;
+    line-height: 1.1;
+    background: linear-gradient(135deg, var(--text) 0%, var(--accent) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 10px;
+  }
+
+  .header p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  /* Stats bar */
+  .stats-bar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 10px;
+    text-align: center;
+    transition: border-color 0.3s;
+  }
+
+  .stat-card .stat-val {
+    font-family: 'Space Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .stat-card .stat-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  /* Level indicator */
+  .level-bar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+
+  .level-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .level-badge {
+    background: linear-gradient(135deg, var(--accent), #38b2ac);
+    color: #0a0e1a;
+    font-family: 'Space Mono', monospace;
+    font-weight: 700;
+    font-size: 18px;
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .level-text h3 {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .level-text p {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-top: 2px;
+  }
+
+  .accuracy-pill {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+  }
+
+  .accuracy-pill.high { border-color: var(--correct); color: var(--correct); }
+  .accuracy-pill.low { border-color: var(--wrong); color: var(--wrong); }
+
+  /* Game area */
+  .game-area {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 30px 20px;
+    margin-bottom: 20px;
+    min-height: 340px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .game-area::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(79,209,197,0.03) 0%, transparent 60%);
+    pointer-events: none;
+  }
+
+  /* Stimulus display */
+  .stimulus-container {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin-bottom: 24px;
+  }
+
+  .stimulus-ring {
+    position: absolute;
+    inset: -10px;
+    border-radius: 50%;
+    border: 2px solid rgba(79,209,197,0.2);
+    animation: ringPulse 2s ease-in-out infinite;
+  }
+
+  @keyframes ringPulse {
+    0%, 100% { transform: scale(1); opacity: 0.4; }
+    50% { transform: scale(1.05); opacity: 0.8; }
+  }
+
+  .stimulus-box {
+    width: 160px;
+    height: 160px;
+    background: var(--surface);
+    border: 2px solid var(--border);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.15s;
+  }
+
+  .stimulus-box.show {
+    border-color: var(--accent);
+    background: rgba(79,209,197,0.05);
+    box-shadow: 0 0 40px rgba(79,209,197,0.2), inset 0 0 30px rgba(79,209,197,0.05);
+  }
+
+  .stimulus-box.correct-flash {
+    border-color: var(--correct) !important;
+    background: rgba(104,211,145,0.1) !important;
+    box-shadow: 0 0 50px rgba(104,211,145,0.3) !important;
+  }
+
+  .stimulus-box.wrong-flash {
+    border-color: var(--wrong) !important;
+    background: rgba(252,129,129,0.1) !important;
+    box-shadow: 0 0 50px rgba(252,129,129,0.3) !important;
+  }
+
+  .stimulus-item {
+    font-family: 'Space Mono', monospace;
+    font-size: 72px;
+    font-weight: 700;
+    color: var(--accent);
+    transition: opacity 0.1s;
+    user-select: none;
+  }
+
+  .stimulus-item.hidden { opacity: 0; }
+
+  /* History dots */
+  .history-dots {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    color: var(--text-muted);
+    transition: all 0.3s;
+  }
+
+  .dot.active {
+    background: rgba(79,209,197,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+
+  .dot.target {
+    background: rgba(246,173,85,0.15);
+    border-color: var(--accent2);
+    color: var(--accent2);
+    box-shadow: 0 0 12px rgba(246,173,85,0.2);
+  }
+
+  .dot.n-back-target {
+    background: rgba(246,173,85,0.3);
+    border-color: var(--accent2);
+    color: var(--accent2);
+    box-shadow: 0 0 12px rgba(246,173,85,0.3);
+    font-weight: 700;
+  }
+
+  /* Instruction */
+  .instruction {
+    font-size: 14px;
+    color: var(--text-muted);
+    text-align: center;
+    line-height: 1.6;
+    max-width: 380px;
+  }
+
+  .instruction strong {
+    color: var(--accent2);
+    font-weight: 700;
+  }
+
+  /* Buttons */
+  .btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .btn {
+    border: none;
+    border-radius: 14px;
+    padding: 18px 24px;
+    font-family: 'Noto Sans KR', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+    letter-spacing: 0.5px;
+  }
+
+  .btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,0.1);
+    opacity: 0;
+    transition: opacity 0.15s;
+  }
+
+  .btn:hover::before { opacity: 1; }
+  .btn:active { transform: scale(0.97); }
+
+  .btn-same {
+    background: linear-gradient(135deg, #2d6a4f, #40916c);
+    color: #d8f3dc;
+    border: 1px solid rgba(104,211,145,0.3);
+  }
+
+  .btn-diff {
+    background: linear-gradient(135deg, #6b2737, #9b2335);
+    color: #ffe4e6;
+    border: 1px solid rgba(252,129,129,0.3);
+  }
+
+  .btn-start {
+    grid-column: 1 / -1;
+    background: linear-gradient(135deg, var(--accent), #38b2ac);
+    color: #0a0e1a;
+    font-size: 16px;
+    padding: 20px;
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-skip {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-size: 13px;
+    padding: 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    width: 100%;
+    font-family: 'Noto Sans KR', sans-serif;
+    transition: all 0.15s;
+  }
+  .btn-skip:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* Feedback message */
+  .feedback {
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    margin-bottom: 12px;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .feedback.correct { color: var(--correct); }
+  .feedback.wrong { color: var(--wrong); }
+  .feedback.info { color: var(--accent); }
+
+  /* Progress bar */
+  .progress-wrap {
+    background: var(--surface);
+    border-radius: 4px;
+    height: 4px;
+    margin-bottom: 20px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* Timer arc */
+  .timer-container {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+  }
+
+  .timer-svg { transform: rotate(-90deg); }
+  .timer-bg { fill: none; stroke: var(--border); stroke-width: 3; }
+  .timer-arc {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 3;
+    stroke-linecap: round;
+    transition: stroke-dashoffset 0.1s linear;
+  }
+
+  /* Start screen */
+  .start-screen {
+    text-align: center;
+    padding: 20px 0;
+  }
+
+  .start-screen .big-icon {
+    font-size: 60px;
+    margin-bottom: 16px;
+    display: block;
+    animation: float 3s ease-in-out infinite;
+  }
+
+  @keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+  }
+
+  .start-screen h2 {
+    font-size: 22px;
+    font-weight: 900;
+    margin-bottom: 12px;
+    color: var(--text);
+  }
+
+  .start-screen p {
+    color: var(--text-muted);
+    font-size: 14px;
+    line-height: 1.7;
+    max-width: 400px;
+    margin: 0 auto 8px;
+  }
+
+  .how-to {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    margin: 16px 0;
+    text-align: left;
+  }
+
+  .how-to h4 {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-family: 'Space Mono', monospace;
+    margin-bottom: 10px;
+  }
+
+  .how-to ul {
+    list-style: none;
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.8;
+  }
+
+  .how-to ul li::before {
+    content: '▸ ';
+    color: var(--accent);
+  }
+
+  /* Result screen */
+  .result-screen {
+    text-align: center;
+    padding: 10px 0;
+  }
+
+  .result-score {
+    font-family: 'Space Mono', monospace;
+    font-size: 56px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+
+  .result-label {
+    color: var(--text-muted);
+    font-size: 13px;
+    margin-bottom: 20px;
+    letter-spacing: 1px;
+  }
+
+  .result-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .result-item {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .result-item span {
+    display: block;
+    font-family: 'Space Mono', monospace;
+    font-size: 20px;
+    color: var(--text);
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  /* Keyboard hint */
+  .key-hints {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  .key-hint {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .key {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    color: var(--text);
+  }
+
+  /* Responsive */
+  @media (max-width: 480px) {
+    .stats-bar { grid-template-columns: repeat(2, 1fr); }
+    .stimulus-container { width: 130px; height: 130px; }
+    .stimulus-box { width: 130px; height: 130px; }
+    .stimulus-item { font-size: 56px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <div class="badge">🧠 인지 훈련</div>
+    <h1>N-Back<br>뇌 훈련</h1>
+    <p>단기 기억력과 집중력을 동시에 강화하는<br>과학적으로 검증된 인지 훈련 게임</p>
+  </div>
+
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-val" id="statLevel">1</div>
+      <div class="stat-label">N-Back</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statScore">0</div>
+      <div class="stat-label">점수</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statStreak">0</div>
+      <div class="stat-label">연속 정답</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-val" id="statAccuracy">—</div>
+      <div class="stat-label">정확도</div>
+    </div>
+  </div>
+
+  <div class="level-bar">
+    <div class="level-info">
+      <div class="level-badge" id="levelBadge">1</div>
+      <div class="level-text">
+        <h3 id="levelName">1-Back</h3>
+        <p id="levelDesc">바로 직전과 같은가?</p>
+      </div>
+    </div>
+    <div class="accuracy-pill" id="accuracyPill">시작 전</div>
+  </div>
+
+  <div class="progress-wrap">
+    <div class="progress-fill" id="progressFill" style="width:0%"></div>
+  </div>
+
+  <div class="game-area" id="gameArea">
+    <!-- Start screen -->
+    <div class="start-screen" id="startScreen">
+      <span class="big-icon">🧠</span>
+      <h2>N-Back 훈련 시작하기</h2>
+      <p>화면에 숫자가 하나씩 나타납니다.<br>현재 숫자가 <strong style="color:var(--accent2)">N단계 전</strong>에 나온 숫자와 같으면 <strong style="color:var(--correct)">같음</strong>,<br>다르면 <strong style="color:var(--wrong)">다름</strong>을 누르세요.</p>
+      <div class="how-to">
+        <h4>게임 방식</h4>
+        <ul>
+          <li>1-Back: 바로 직전 숫자와 비교</li>
+          <li>정답률 90% 이상 시 난이도 상승</li>
+          <li>2-Back에서는 두 단계 전과 비교</li>
+          <li>키보드: A(같음) / L(다름)</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Game screen (hidden initially) -->
+    <div id="gameScreen" style="display:none; width:100%; display:none; flex-direction:column; align-items:center;">
+      <div class="timer-container">
+        <svg class="timer-svg" width="44" height="44" viewBox="0 0 44 44">
+          <circle class="timer-bg" cx="22" cy="22" r="18"/>
+          <circle class="timer-arc" id="timerArc" cx="22" cy="22" r="18"
+            stroke-dasharray="113.1" stroke-dashoffset="0"/>
+        </svg>
+      </div>
+
+      <div class="history-dots" id="historyDots"></div>
+
+      <div class="stimulus-container">
+        <div class="stimulus-ring"></div>
+        <div class="stimulus-box" id="stimulusBox">
+          <span class="stimulus-item hidden" id="stimulusItem">?</span>
+        </div>
+      </div>
+
+      <div class="instruction" id="instruction">준비하세요...</div>
+    </div>
+
+    <!-- Result screen (hidden initially) -->
+    <div id="resultScreen" style="display:none;" class="result-screen">
+      <div class="result-score" id="resultScore">0</div>
+      <div class="result-label">최종 점수</div>
+      <div class="result-grid">
+        <div class="result-item"><span id="resCorrect">0</span>정답</div>
+        <div class="result-item"><span id="resWrong">0</span>오답</div>
+        <div class="result-item"><span id="resMaxLevel">1</span>최고 레벨</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="feedback" id="feedback"></div>
+
+  <div class="btn-row" id="btnRow">
+    <button class="btn btn-start" id="btnStart" onclick="startGame()" style="grid-column: 1/-1">
+      🚀 훈련 시작
+    </button>
+  </div>
+
+  <div class="key-hints" id="keyHints" style="display:none">
+    <div class="key-hint"><span class="key">A</span> 같음</div>
+    <div class="key-hint"><span class="key">L</span> 다름</div>
+  </div>
+</div>
+
+<script>
+// ─── State ──────────────────────────────────────────
+const ITEMS_PER_ROUND = 20;
+const MATCH_PROB = 0.35;
+const LEVEL_UP_THRESHOLD = 0.90;
+const BASE_INTERVAL = 2500;
+const MIN_INTERVAL = 1200;
+const INTERVAL_STEP = 200;
+
+let state = {
+  phase: 'start', // start | playing | result
+  nBack: 1,
+  interval: BASE_INTERVAL,
+  sequence: [],
+  currentIdx: -1,
+  canRespond: false,
+  responded: false,
+  score: 0,
+  streak: 0,
+  correct: 0,
+  wrong: 0,
+  roundAnswers: [], // {match: bool, responded: bool, correct: bool}
+  totalAnswers: [],
+  maxLevel: 1,
+  timer: null,
+  showTimer: null,
+  timerStart: null,
+  timerDuration: 0,
+};
+
+// Number pool: 1-9
+const POOL = [1,2,3,4,5,6,7,8,9];
+
+function generateItem(sequence, nBack) {
+  if (sequence.length >= nBack && Math.random() < MATCH_PROB) {
+    return sequence[sequence.length - nBack];
+  }
+  // Avoid accidental match
+  let val;
+  do { val = POOL[Math.floor(Math.random() * POOL.length)]; }
+  while (sequence.length >= nBack && val === sequence[sequence.length - nBack]);
+  return val;
+}
+
+function isMatch(sequence, idx, nBack) {
+  if (idx < nBack) return false;
+  return sequence[idx] === sequence[idx - nBack];
+}
+
+// ─── UI helpers ──────────────────────────────────────
+function $(id) { return document.getElementById(id); }
+
+function setFeedback(msg, type) {
+  const el = $('feedback');
+  el.textContent = msg;
+  el.className = 'feedback ' + (type || '');
+}
+
+function updateStats() {
+  $('statLevel').textContent = state.nBack;
+  $('statScore').textContent = state.score;
+  $('statStreak').textContent = state.streak;
+  const total = state.totalAnswers.length;
+  if (total === 0) {
+    $('statAccuracy').textContent = '—';
+    $('accuracyPill').textContent = '시작 전';
+    $('accuracyPill').className = 'accuracy-pill';
+  } else {
+    const acc = Math.round((state.correct / total) * 100);
+    $('statAccuracy').textContent = acc + '%';
+    $('accuracyPill').textContent = acc + '%';
+    $('accuracyPill').className = 'accuracy-pill' + (acc >= 80 ? ' high' : ' low');
+  }
+  $('levelBadge').textContent = state.nBack;
+  $('statLevel').textContent = state.nBack;
+  const names = { 1: '1-Back', 2: '2-Back', 3: '3-Back' };
+  const descs = { 1: '바로 직전과 같은가?', 2: '두 단계 전과 같은가?', 3: '세 단계 전과 같은가?' };
+  $('levelName').textContent = names[state.nBack] || state.nBack + '-Back';
+  $('levelDesc').textContent = descs[state.nBack] || state.nBack + '단계 전과 비교';
+}
+
+function updateProgress() {
+  const pct = (state.currentIdx + 1) / ITEMS_PER_ROUND * 100;
+  $('progressFill').style.width = Math.max(0, pct) + '%';
+}
+
+function updateHistoryDots() {
+  const dots = $('historyDots');
+  const displayCount = Math.min(10, state.sequence.length);
+  const start = Math.max(0, state.sequence.length - displayCount);
+  dots.innerHTML = '';
+  for (let i = start; i < state.sequence.length; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'dot';
+    dot.textContent = state.sequence[i];
+    const targetIdx = state.sequence.length - 1 - state.nBack;
+    if (i === state.sequence.length - 1) dot.classList.add('active');
+    else if (i === targetIdx) dot.classList.add('n-back-target');
+    dots.appendChild(dot);
+  }
+}
+
+function animateTimer() {
+  const arc = $('timerArc');
+  const circumference = 113.1;
+  const elapsed = Date.now() - state.timerStart;
+  const pct = Math.max(0, 1 - elapsed / state.timerDuration);
+  arc.style.strokeDashoffset = circumference * (1 - pct);
+
+  // Color shift
+  if (pct > 0.5) arc.style.stroke = 'var(--accent)';
+  else if (pct > 0.25) arc.style.stroke = 'var(--accent2)';
+  else arc.style.stroke = 'var(--wrong)';
+
+  if (elapsed < state.timerDuration) {
+    state.showTimer = requestAnimationFrame(animateTimer);
+  }
+}
+
+// ─── Game logic ──────────────────────────────────────
+function startGame() {
+  state = {
+    ...state,
+    phase: 'playing',
+    nBack: 1,
+    interval: BASE_INTERVAL,
+    sequence: [],
+    currentIdx: -1,
+    canRespond: false,
+    responded: false,
+    score: 0,
+    streak: 0,
+    correct: 0,
+    wrong: 0,
+    roundAnswers: [],
+    totalAnswers: [],
+    maxLevel: 1,
+  };
+  clearTimers();
+
+  $('startScreen').style.display = 'none';
+  $('resultScreen').style.display = 'none';
+  $('gameScreen').style.display = 'flex';
+  $('gameScreen').style.flexDirection = 'column';
+  $('gameScreen').style.alignItems = 'center';
+  $('gameScreen').style.width = '100%';
+
+  $('btnRow').innerHTML = `
+    <button class="btn btn-same" id="btnSame" onclick="respond(true)" disabled>✅ 같음</button>
+    <button class="btn btn-diff" id="btnDiff" onclick="respond(false)" disabled>❌ 다름</button>
+  `;
+  $('keyHints').style.display = 'flex';
+
+  updateStats();
+  updateProgress();
+
+  setTimeout(nextStimulus, 800);
+}
+
+function clearTimers() {
+  if (state.timer) clearTimeout(state.timer);
+  if (state.showTimer) cancelAnimationFrame(state.showTimer);
+}
+
+function nextStimulus() {
+  if (state.currentIdx + 1 >= ITEMS_PER_ROUND) {
+    endRound();
+    return;
+  }
+
+  // Generate next item
+  const item = generateItem(state.sequence, state.nBack);
+  state.sequence.push(item);
+  state.currentIdx++;
+  state.canRespond = false;
+  state.responded = false;
+
+  updateHistoryDots();
+  updateProgress();
+  setFeedback('', '');
+
+  const matchNow = isMatch(state.sequence, state.currentIdx, state.nBack);
+  const waitingForResponse = state.currentIdx >= state.nBack;
+
+  // Instruction
+  if (state.currentIdx < state.nBack) {
+    $('instruction').innerHTML = `<strong style="color:var(--accent)">${state.nBack}개</strong>가 쌓이면 비교가 시작됩니다 (${state.currentIdx + 1}/${state.nBack})`;
+  } else {
+    $('instruction').innerHTML = `<strong style="color:var(--accent2)">${state.nBack}단계 전</strong> 숫자와 같은가요?`;
+  }
+
+  // Show stimulus
+  const box = $('stimulusBox');
+  const item_el = $('stimulusItem');
+
+  item_el.textContent = item;
+  item_el.classList.remove('hidden');
+  box.classList.add('show');
+
+  // Timer
+  const showDuration = Math.min(1200, state.interval * 0.5);
+  state.timerStart = Date.now();
+  state.timerDuration = state.interval;
+  if (state.showTimer) cancelAnimationFrame(state.showTimer);
+  state.showTimer = requestAnimationFrame(animateTimer);
+
+  // Enable response after showing
+  if (waitingForResponse) {
+    $('btnSame').disabled = false;
+    $('btnDiff').disabled = false;
+    state.canRespond = true;
+  }
+
+  // Hide stimulus
+  state.timer = setTimeout(() => {
+    item_el.classList.add('hidden');
+    box.classList.remove('show');
+
+    // If no response given, count as wrong
+    if (waitingForResponse && !state.responded) {
+      processNoResponse();
+    }
+
+    state.timer = setTimeout(nextStimulus, 200);
+  }, showDuration);
+}
+
+function processNoResponse() {
+  const matchNow = isMatch(state.sequence, state.currentIdx, state.nBack);
+  if (matchNow) {
+    // Should have pressed same — missed
+    state.wrong++;
+    state.streak = 0;
+    state.totalAnswers.push({ correct: false });
+    state.roundAnswers.push({ correct: false });
+    setFeedback('⏰ 시간 초과', 'wrong');
+    $('stimulusBox').classList.add('wrong-flash');
+    setTimeout(() => $('stimulusBox').classList.remove('wrong-flash'), 300);
+  } else {
+    // Not pressing for non-match is correct (implicitly)
+    state.correct++;
+    state.streak++;
+    state.score += 5;
+    state.totalAnswers.push({ correct: true });
+    state.roundAnswers.push({ correct: true });
+  }
+  $('btnSame').disabled = true;
+  $('btnDiff').disabled = true;
+  updateStats();
+}
+
+function respond(same) {
+  if (!state.canRespond || state.responded) return;
+  state.responded = true;
+  state.canRespond = false;
+  $('btnSame').disabled = true;
+  $('btnDiff').disabled = true;
+
+  const matchNow = isMatch(state.sequence, state.currentIdx, state.nBack);
+  const correct = same === matchNow;
+
+  const box = $('stimulusBox');
+
+  if (correct) {
+    state.correct++;
+    state.streak++;
+    const bonus = state.streak > 2 ? state.streak : 1;
+    state.score += 10 * bonus;
+    state.totalAnswers.push({ correct: true });
+    state.roundAnswers.push({ correct: true });
+    setFeedback(state.streak > 2 ? `🔥 연속 ${state.streak}! +${10 * bonus}` : '✓ 정답! +10', 'correct');
+    box.classList.add('correct-flash');
+    setTimeout(() => box.classList.remove('correct-flash'), 300);
+  } else {
+    state.wrong++;
+    state.streak = 0;
+    state.totalAnswers.push({ correct: false });
+    state.roundAnswers.push({ correct: false });
+    setFeedback('✗ 오답', 'wrong');
+    box.classList.add('wrong-flash');
+    setTimeout(() => box.classList.remove('wrong-flash'), 300);
+  }
+
+  updateStats();
+}
+
+function endRound() {
+  clearTimers();
+  $('btnSame').disabled = true;
+  $('btnDiff').disabled = true;
+
+  // Check accuracy for level/speed adjustment
+  const answerable = state.roundAnswers.length;
+  const correctCount = state.roundAnswers.filter(a => a.correct).length;
+  const acc = answerable > 0 ? correctCount / answerable : 0;
+
+  setFeedback('', '');
+  $('instruction').textContent = '';
+  $('historyDots').innerHTML = '';
+
+  if (acc >= LEVEL_UP_THRESHOLD) {
+    // Level up or speed up
+    if (state.interval > MIN_INTERVAL) {
+      state.interval = Math.max(MIN_INTERVAL, state.interval - INTERVAL_STEP);
+      setFeedback(`🚀 속도 업! 인터벌 ${(state.interval/1000).toFixed(1)}초`, 'info');
+    } else if (state.nBack < 4) {
+      state.nBack++;
+      state.interval = BASE_INTERVAL; // Reset interval for new level
+      setFeedback(`🎉 ${state.nBack}-Back으로 승급!`, 'info');
+    }
+    state.maxLevel = Math.max(state.maxLevel, state.nBack);
+  }
+
+  updateStats();
+  state.roundAnswers = [];
+  state.sequence = [];
+  state.currentIdx = -1;
+
+  // Show result and offer continue
+  setFeedback(`이번 라운드 정확도: ${Math.round(acc * 100)}%`, acc >= LEVEL_UP_THRESHOLD ? 'correct' : 'info');
+
+  $('btnRow').innerHTML = `
+    <button class="btn btn-start" onclick="startGame()" style="grid-column:1/-1">🔄 다음 라운드</button>
+  `;
+
+  // Show mini summary in game area
+  $('instruction').innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:36px;margin-bottom:8px;">${acc >= 0.9 ? '🏆' : acc >= 0.7 ? '👍' : '💪'}</div>
+      <div style="font-size:20px;font-weight:900;color:${acc >= 0.9 ? 'var(--correct)' : 'var(--accent)'}">
+        ${Math.round(acc * 100)}%
+      </div>
+      <div style="font-size:13px;color:var(--text-muted);margin-top:4px;">이번 라운드 정확도</div>
+    </div>
+  `;
+  $('historyDots').innerHTML = '';
+}
+
+// ─── Keyboard ──────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  if (state.phase !== 'playing') return;
+  if (e.key === 'a' || e.key === 'A') respond(true);
+  if (e.key === 'l' || e.key === 'L') respond(false);
+});
+</script>
+</body>
+</html>
